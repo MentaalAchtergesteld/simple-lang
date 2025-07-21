@@ -1,0 +1,56 @@
+program ::= { statement } ;
+statement ::= function
+						|	declaration	
+						|	assignment
+						|	return
+						|	if
+						|	while
+						|	expression ;
+
+function ::= "fn" identifier "(" [ paramater_list ] ")" block ;
+
+parameter_list ::= identifier { "," identifier } ;
+
+block ::= "{" { statement} } "}" ;
+
+declaration ::= "let" identifier "=" expression ";" ;
+
+assignment ::= identifier "=" expression ";" ;
+
+return ::= "return" expression ";" ;
+
+if ::= "if" "(" expression ")" block [ "else" ( if | block ) ];
+
+while ::= "while" "(" expression ")" block;
+
+expression ::= equality;
+
+equality ::= comparison { ( "==" | "!=" ) comparison } ;
+
+comparison ::= term { ( "<" | "<=" | ">=" | ">" ) term } ;
+
+term ::= factor { ( "+" | "-" ) factor } ;
+
+factor ::= unary { ( "*" | "/" | "%" ) unary } ;
+
+unary ::= ( "-" | "+" ) unary | primary ;
+
+primary ::= number
+					| identifier
+					| "(" expression ")"
+					| function_call ;
+
+function_call ::= identifier "(" [ argument_list ] ")" ;
+
+argument_list ::= expression { "," expression } ;
+
+identifier ::= letter { letter | digit | "_" } ;
+
+number ::= integer | float ;
+integer ::= digit { digit } ;
+float ::= digit { digit} "." digit { digit } ;
+
+letter ::= "a" | ... | "z" | "A" | ... | "Z" ;
+
+digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
