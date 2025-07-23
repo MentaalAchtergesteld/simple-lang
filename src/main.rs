@@ -7,6 +7,7 @@ use parser::Parser;
 mod lexer;
 mod parser;
 mod interpreter;
+mod stackcompiler;
 
 fn main() -> Result<(), ()> {
     let input = fs::read_to_string("./test.sl")
@@ -30,10 +31,15 @@ fn main() -> Result<(), ()> {
         })
     }));
 
-    let mut interpreter = Interpreter { env: Rc::new(RefCell::new(env)) };
+    // let mut interpreter = Interpreter { env: Rc::new(RefCell::new(env)) };
+    //
+    // interpreter.interpret_program(tree)
+    //     .map_err(|e| eprintln!("ERROR: couldn't interpret program: {e}"))?;
+    
+    let mut stack_compiler = stackcompiler::Compiler::new();
 
-    interpreter.interpret_program(tree)
-        .map_err(|e| eprintln!("ERROR: couldn't interpret program: {e}"))?;
+    stack_compiler.compile_program(&tree);
+    println!("{:?}", stack_compiler.code);
 
     Ok(())
 }
