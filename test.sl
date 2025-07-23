@@ -1,8 +1,13 @@
-let a = 10;
-''
+fn fibonacci() {
+	let a = 0;
+	let b = 1;
 
-fn test(a, b, c) {
-	let b = a + b;
-	let c = b * 20;
-	return c;
+	while (a < 1000) {
+		let c = a;
+		a = a + b;
+		b = c;
+		print(a);
+	}
 }
+
+fibonacci();

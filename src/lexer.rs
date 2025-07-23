@@ -1,20 +1,42 @@
-use std::{fmt, iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
-pub enum LexerError {
-    UnknownChar(char, Span),
-    InvalidNumber(String, Span),
+pub enum LexerErrorKind {
+    UnknownChar(char),
+    InvalidNumber(String),
 }
 
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for LexerErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownChar(c, span)     => f.write_str(&format!("Unknown character `{c}` at {span:?}")),
-            Self::InvalidNumber(str, span) => f.write_str(&format!("Invalid number `{str}` at {span:?} ")),
-        } 
+            Self::UnknownChar(c)   => f.write_str(&format!("Unknown character: `{c}`")),
+            Self::InvalidNumber(s) => f.write_str(&format!("Invalid number: `{s}`"))
+        }
     }
 }
 
-#[derive(Debug)]
+pub struct LexerError {
+    kind: LexerErrorKind,
+    span: Span
+}
+
+impl LexerError {
+    pub fn new(kind: LexerErrorKind, span: Span) -> Self {
+        LexerError { kind, span }
+    }
+
+    pub fn with_source(&self, source: &str) -> String {
+        let mut base = format!("{} at line {}, column {}", self.kind, self.span.line, self.span.column);
+        if let Some(line_start) = source.lines().nth(self.span.line-1) {
+            let caret_line = " ".repeat(self.span.column-1) + "^";
+
+            base.push_str(&format!(":\n{}", line_start));
+            base.push_str(&format!("\n{}", caret_line));
+        } 
+        base 
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub enum TokenKind {
     // Keywords 
     Fn,
@@ -55,7 +77,46 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug)]
+impl std::fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fn => f.write_str("fn"),
+            Self::Return => f.write_str("return"),
+            Self::Let => f.write_str("let"),
+            Self::If => f.write_str("if"),
+            Self::Else => f.write_str("else"),
+            Self::While => f.write_str("while"),
+            Self::Identifier(s) => if s.is_empty() {
+                f.write_str("identifier")
+            } else {
+                f.write_str(&format!("identifier: {s}"))
+            },
+            Self::Number(n) => f.write_str(&format!("number: {n}")),
+            Self::Plus => f.write_str("+"),
+            Self::Minus => f.write_str("-"),
+            Self::Star => f.write_str("*"),
+            Self::Slash => f.write_str("/"),
+            Self::Percent => f.write_str("%"),
+            Self::Equal => f.write_str("="),
+            Self::EqualEqual => f.write_str("=="),
+            Self::Bang => f.write_str("!"),
+            Self::BangEqual => f.write_str("!="),
+            Self::Less => f.write_str("<"),
+            Self::LessEqual => f.write_str("<="),
+            Self::Greater => f.write_str(">"),
+            Self::GreaterEqual => f.write_str(">="),
+            Self::LeftParen => f.write_str("("),
+            Self::RightParen => f.write_str(")"),
+            Self::LeftCurly => f.write_str("{"),
+            Self::RightCurly => f.write_str("}"),
+            Self::Comma => f.write_str(","),
+            Self::Semicolon => f.write_str(";"),
+            Self::Eof => f.write_str("end of file")
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
@@ -96,7 +157,7 @@ impl<'a> Lexer<'a> {
             source,
             current_index: 0,
             line: 1,
-            column: 1,
+            column: 0,
             input
         }
     }
@@ -105,11 +166,12 @@ impl<'a> Lexer<'a> {
         let ch = self.input.next()?;
         self.current_index += ch.len_utf8();
 
+        self.column += 1;
         if ch == '\n' {
             self.line += 1;
+            self.column = 0;
         }
 
-        self.column += 1;
 
         Some(ch)
     }
@@ -161,7 +223,7 @@ impl<'a> Lexer<'a> {
             '<' => {
                 match self.input.peek() {
                     Some('=') => { self.next_char(); Ok(self.create_token(TokenKind::LessEqual, start)) },
-                    _ => Ok(self.create_token(TokenKind::Let, start)),
+                    _ => Ok(self.create_token(TokenKind::Less, start)),
                 }
             },
             '>' => {
@@ -192,7 +254,7 @@ impl<'a> Lexer<'a> {
                     num_str.push_str(&self.consume_while(|c| c.is_ascii_digit()));
                 };
                 
-                let num = num_str.parse::<f32>().map_err(|_| LexerError::InvalidNumber(num_str, self.create_span(start)))?;
+                let num = num_str.parse::<f32>().map_err(|_| LexerError::new(LexerErrorKind::InvalidNumber(num_str), self.create_span(start)))?;
                 Ok(self.create_token(TokenKind::Number(num), start))
             },
             c if c.is_ascii_alphabetic() || c == '_' => {
@@ -210,7 +272,7 @@ impl<'a> Lexer<'a> {
                 }
                 
             },
-            _ => Err(LexerError::UnknownChar(char, self.create_span(start))),
+            _ => Err(LexerError::new(LexerErrorKind::UnknownChar(char), self.create_span(start))),
         }
     }
 }

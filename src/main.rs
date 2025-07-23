@@ -1,9 +1,12 @@
-use std::fs;
+use std::{cell::RefCell, fs, rc::Rc};
 
+use interpreter::{Environment, Function, Interpreter, Value};
 use lexer::{Lexer, LexerError, Token};
+use parser::Parser;
 
 mod lexer;
 mod parser;
+mod interpreter;
 
 fn main() -> Result<(), ()> {
     let input = fs::read_to_string("./test.sl")
@@ -11,15 +14,26 @@ fn main() -> Result<(), ()> {
 
     let lexer = Lexer::new(&input);
     let tokens = lexer.collect::<Result<Vec<Token>, LexerError>>()
-        .map_err(|e| eprintln!("ERROR: couldn't tokenize file: {e}"))?;
+        .map_err(|e| eprintln!("{}", e.with_source(&input)))?;
 
-    println!("Tokens: {tokens:?}");
+    let mut parser = Parser::new(&tokens);
+    let tree = parser.parse_program()
+        .map_err(|e| eprintln!("{}", e.with_source(&input)))?;
 
-    for token in tokens {
-        let kind = token.kind;
-        let span = token.span;
-        println!("Token: {kind:?}: {}", input[span.start..span.end].to_string().trim());
-    }
+    let mut env = Environment::new();
+
+    env.define("print".into(), Value::Function(Function::Native {
+        arity: 1,
+        func: Rc::new(|args| {
+            println!("{}", args[0]);
+            Ok(Value::Unit)
+        })
+    }));
+
+    let mut interpreter = Interpreter { env: Rc::new(RefCell::new(env)) };
+
+    interpreter.interpret_program(tree)
+        .map_err(|e| eprintln!("ERROR: couldn't interpret program: {e}"))?;
 
     Ok(())
 }
